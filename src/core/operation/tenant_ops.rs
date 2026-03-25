@@ -9,7 +9,7 @@ use crate::utils::cache::RedisCache;
 use crate::utils::cache_error::CacheError;
 use crate::utils::domains_ids::{TenantID, AgencyID};
 use crate::handlers::messages::nats_handler::NatsHandler;
-use crate::handlers::messages::{StateChangedEvent, EntityType};
+use crate::handlers::messages::{StateChangedEvent, EntityType, TenantCreatedEvent};
 
 pub struct TenantOps<'a> {
     repo: &'a MongoTenantRepo,
@@ -29,6 +29,16 @@ impl<'a> TenantOps<'a> {
     pub async fn create_tenant(&self, new_tenant: NewTenant) -> Result<Tenant, TenantError> {
         let entity = TenantEntity::new(new_tenant, self.repo);
         let tenant = entity.create().await?;
+        
+        // Notificar creación de tenant vía NATS
+        if let Some(id) = &tenant.id {
+            let event = TenantCreatedEvent {
+                tenant_id: id.to_string(),
+                name: tenant.name.clone(),
+            };
+            let _ = self.nats_handler.publish_tenant_created(event).await;
+        }
+
         self.clear_cache().await?;
         Ok(tenant)
     }

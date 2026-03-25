@@ -1,6 +1,6 @@
 use std::env;
 use async_nats::jetstream::{self, Context as JetStreamContext};
-use crate::handlers::messages::StateChangedEvent;
+use crate::handlers::messages::{StateChangedEvent, TenantCreatedEvent};
 use serde_json;
 
 #[derive(Clone)]
@@ -16,11 +16,33 @@ impl NatsHandler {
         
         let js = jetstream::new(client);
         
-        // Opcional: Asegurarse de que el stream existe
-        // En este caso, asumimos que el stream 'EVENTS' o similar está pre-configurado
-        // o lo creamos si es necesario. Para simplicidad, publicaremos directamente.
+        // Asegurarse de que el stream TENANTS existe
+        let stream_name = "TENANTS";
+        let subjects = vec!["tenant.created".to_string(), "tenant.state.*".to_string(), "agency.state.*".to_string()];
+
+        let _stream = match js.get_stream(stream_name).await {
+            Ok(stream) => stream,
+            Err(_) => {
+                js.create_stream(jetstream::stream::Config {
+                    name: stream_name.to_string(),
+                    subjects,
+                    ..Default::default()
+                }).await.map_err(|e| format!("Failed to create stream {}: {}", stream_name, e))?
+            }
+        };
 
         Ok(Self { js })
+    }
+
+    pub async fn publish_tenant_created(&self, event: TenantCreatedEvent) -> Result<(), String> {
+        let subject = "tenant.created".to_string();
+        let payload = serde_json::to_vec(&event)
+            .map_err(|e| format!("Failed to serialize event: {}", e))?;
+
+        self.js.publish(subject, payload.into()).await
+            .map_err(|e| format!("Failed to publish to JetStream: {}", e))?;
+
+        Ok(())
     }
 
     pub async fn publish_state_changed(&self, event: StateChangedEvent) -> Result<(), String> {

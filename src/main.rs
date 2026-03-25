@@ -22,7 +22,14 @@ async fn main() -> io::Result<()>
 
 
     let redis_cache = RedisCache::new(&*env::var("REDIS_URI").unwrap()).expect("Error al conectar a Redis");
-    let nats_handler = NatsHandler::new().await.expect("Error al conectar a NATS");
+    let nats_handler = match NatsHandler::new().await {
+        Ok(handler) => handler,
+        Err(e) => {
+            eprintln!("ERROR CRÍTICO: No se pudo conectar a NATS o JetStream no está disponible: {}", e);
+            eprintln!("Asegúrate de que el servidor NATS tenga JetStream habilitado (ej: nats-server -js)");
+            std::process::exit(1);
+        }
+    };
 
     let context = Arc::new(Context::new(client.clone(), redis_cache, nats_handler));
     let migration_context = MigrationContext{ client: client.clone()};

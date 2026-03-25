@@ -15,3 +15,9 @@ pub struct StateChangedEvent {
     pub entity_id: String,
     pub state: TenantState,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TenantCreatedEvent {
+    pub tenant_id: String,
+    pub name: String,
+}
