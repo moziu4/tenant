@@ -18,6 +18,7 @@ use crate::{
         domain::tenant::{
             tenant_error::TenantError,
             tenant_type::{LoadTenantsByAgency, NewTenant},
+            TenantEntity,
         },
         operation::tenant_ops::TenantOps,
     },
@@ -33,11 +34,14 @@ pub fn config(cfg: &mut web::ServiceConfig)
             .route("/all",          web::get().to(load_all_tenants))
             .route("/by_agency",    web::post().to(load_tenants_by_agency))
             .route("/info",         web::get().to(get_tenant_by_host))
+            .route("/menus/public", web::get().to(get_public_menus))
             .route("/{id}",         web::get().to(get_tenant_by_id))
             .route("/{id}",         web::patch().to(dispatch_commands))
             .route("/{id}",         web::delete().to(delete_tenant_by_id)),
     );
 }
+
+use crate::utils::hub_context::HubContext;
 
 async fn create_tenant(req: HttpRequest, 
                        hub_ctx: HubContext,
@@ -65,8 +69,6 @@ async fn create_tenant(req: HttpRequest,
         Err(err) => HttpResponse::InternalServerError().json(err.to_string()),
     }
 }
-
-use crate::utils::hub_context::HubContext;
 
 async fn load_all_tenants(req: HttpRequest, 
                          hub_ctx: HubContext,
@@ -136,6 +138,26 @@ async fn get_tenant_by_host(hub_ctx: HubContext,
     {
         Ok(tenant) => HttpResponse::Ok().json(tenant),
         Err(TenantError::TenantNotFound) => HttpResponse::NotFound().body("Tenant not found for the provided host"),
+        Err(err) => HttpResponse::InternalServerError().json(err.to_string()),
+    }
+}
+
+async fn get_public_menus(hub_ctx: HubContext,
+                         context: web::Data<Arc<Context>>) -> impl Responder
+{
+    if hub_ctx.tenant_id.is_empty() {
+        return HttpResponse::BadRequest().body("No X-Tenant-Id found in request headers");
+    }
+
+    let tenant_repo = context.get_ref().get_tenant_repo();
+    let tenant_id = match TenantID::parse_str(&hub_ctx.tenant_id) {
+        Ok(id) => id,
+        Err(_) => return HttpResponse::BadRequest().body("Invalid Tenant ID"),
+    };
+
+    match TenantEntity::load_by_id(tenant_id, &tenant_repo).await {
+        Ok(entity) => HttpResponse::Ok().json(entity.get_public_menus()),
+        Err(TenantError::TenantNotFound) => HttpResponse::NotFound().body("Tenant not found"),
         Err(err) => HttpResponse::InternalServerError().json(err.to_string()),
     }
 }

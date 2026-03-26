@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::core::domain::tenant::tenant_type::{TenantState, TenantFeatures, TenantConfiguration};
+use crate::core::domain::tenant::menu::Menu;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "command", rename_all = "snake_case")]
@@ -8,4 +9,5 @@ pub enum TenantCommand {
     UpdateState { state: TenantState },
     UpdateConfiguration { configuration: TenantConfiguration },
     UpdateFeatures { features: TenantFeatures },
+    UpdateMenus { menus: Vec<Menu> },
 }

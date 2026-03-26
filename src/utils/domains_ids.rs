@@ -15,6 +15,10 @@ pub struct TenantID(ObjectId);
 #[serde(transparent)]
 pub struct PlanID(ObjectId);
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct MenuItemID(ObjectId);
+
 // Implementación común para todos los IDs
 macro_rules! implement_id {
     ($type:ident) => {
@@ -62,6 +66,7 @@ macro_rules! implement_id {
 implement_id!(AgencyID);
 implement_id!(TenantID);
 implement_id!(PlanID);
+implement_id!(MenuItemID);
 
 impl std::fmt::Display for AgencyID
 {
@@ -80,6 +85,14 @@ impl std::fmt::Display for TenantID
 }
 
 impl std::fmt::Display for PlanID
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::fmt::Display for MenuItemID
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {

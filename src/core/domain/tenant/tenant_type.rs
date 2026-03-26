@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::utils::domains_ids::{AgencyID, TenantID};
+use super::menu::Menu;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TenantColors {
@@ -31,6 +32,8 @@ pub struct Tenant {
     pub configuration: TenantConfiguration,
     pub state: TenantState,
     pub features: TenantFeatures,
+    #[serde(default)]
+    pub menus: Vec<Menu>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -58,6 +61,8 @@ pub struct NewTenant {
     pub configuration: TenantConfiguration,
     pub state: TenantState,
     pub features: TenantFeatures,
+    #[serde(default)]
+    pub menus: Vec<Menu>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

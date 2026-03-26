@@ -98,6 +98,10 @@ impl<'a> TenantOps<'a> {
             },
             TenantCommand::UpdateConfiguration { configuration } => entity.update_configuration(configuration.clone()),
             TenantCommand::UpdateFeatures { features } => entity.update_features(features.clone()),
+            TenantCommand::UpdateMenus { menus } => {
+                entity.update_menus(menus.clone());
+                Ok(())
+            },
         }
     }
 
