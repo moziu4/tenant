@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::utils::domains_ids::{AgencyID, TenantID};
+use crate::utils::domains_ids::{AgencyID, TenantID, MenuItemID};
 use super::menu::Menu;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -33,6 +33,10 @@ pub struct Tenant {
     pub state: TenantState,
     pub features: TenantFeatures,
     #[serde(default)]
+    pub default_language: String,
+    #[serde(default)]
+    pub available_languages: Vec<String>,
+    #[serde(default)]
     pub menus: Vec<Menu>,
 }
 
@@ -61,6 +65,10 @@ pub struct NewTenant {
     pub configuration: TenantConfiguration,
     pub state: TenantState,
     pub features: TenantFeatures,
+    #[serde(default)]
+    pub default_language: String,
+    #[serde(default)]
+    pub available_languages: Vec<String>,
     #[serde(default)]
     pub menus: Vec<Menu>,
 }

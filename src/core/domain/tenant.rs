@@ -3,9 +3,9 @@ pub mod tenant_error;
 pub mod menu;
 
 use crate::data::access::tenant_repo::MongoTenantRepo;
-use crate::utils::domains_ids::TenantID;
+use crate::utils::domains_ids::{TenantID, MenuItemID};
 use self::tenant_type::{Tenant, NewTenant, TenantState, TenantFeatures, TenantConfiguration};
-use self::menu::Menu;
+use self::menu::{Menu, MenuItem};
 use self::tenant_error::TenantError;
 
 pub struct TenantEntity<'a> {
@@ -16,7 +16,7 @@ pub struct TenantEntity<'a> {
 impl<'a> TenantEntity<'a> {
     pub fn new(new_tenant: NewTenant, repo: &'a MongoTenantRepo) -> Self {
         let menus = if new_tenant.menus.is_empty() {
-            Self::default_menus(&new_tenant.features)
+            Vec::new()
         } else {
             new_tenant.menus
         };
@@ -31,76 +31,17 @@ impl<'a> TenantEntity<'a> {
                 configuration: new_tenant.configuration,
                 state: new_tenant.state,
                 features: new_tenant.features,
+                default_language: new_tenant.default_language,
+                available_languages: new_tenant.available_languages,
                 menus,
             },
         }
     }
 
-    fn default_menus(features: &TenantFeatures) -> Vec<Menu> {
-        use self::menu::{Menu, MenuItem, MenuItemType, FeatureType};
-
-        let mut items = Vec::new();
-
-        // Siempre añadimos Home
-        items.push(MenuItem {
-            id: None,
-            title: "Home".to_string(),
-            item_type: MenuItemType::Page("home".to_string()),
-            order: 0,
-            is_visible_front: true,
-            is_visible_admin: true,
-            permissions: vec![],
-            children: vec![],
-        });
-
-        let mut order = 1;
-
-        if features.shop {
-            items.push(MenuItem {
-                id: None,
-                title: "Shop".to_string(),
-                item_type: MenuItemType::Feature(FeatureType::Shop),
-                order,
-                is_visible_front: true,
-                is_visible_admin: true,
-                permissions: vec![],
-                children: vec![],
-            });
-            order += 1;
-        }
-
-        if features.blog {
-            items.push(MenuItem {
-                id: None,
-                title: "Blog".to_string(),
-                item_type: MenuItemType::Feature(FeatureType::Blog),
-                order,
-                is_visible_front: true,
-                is_visible_admin: true,
-                permissions: vec![],
-                children: vec![],
-            });
-            order += 1;
-        }
-
-        if features.academy {
-            items.push(MenuItem {
-                id: None,
-                title: "Academy".to_string(),
-                item_type: MenuItemType::Feature(FeatureType::Academy),
-                order,
-                is_visible_front: true,
-                is_visible_admin: true,
-                permissions: vec![],
-                children: vec![],
-            });
-        }
-
-        vec![Menu {
-            name: "main".to_string(),
-            items,
-        }]
+    pub fn from_props(props: Tenant, repo: &'a MongoTenantRepo) -> Self {
+        Self { props, repo }
     }
+
 
     pub async fn create(self) -> Result<Tenant, TenantError> {
         self.repo.create(self.props).await
@@ -134,18 +75,37 @@ impl<'a> TenantEntity<'a> {
         Ok(())
     }
 
+    pub fn update_default_language(&mut self, default_language: String) -> Result<(), TenantError> {
+        self.props.default_language = default_language;
+        Ok(())
+    }
+
+    pub fn update_available_languages(&mut self, available_languages: Vec<String>) -> Result<(), TenantError> {
+        self.props.available_languages = available_languages;
+        Ok(())
+    }
+
     pub fn get_props(&self) -> &Tenant {
         &self.props
     }
 
-    pub fn get_public_menus(&self) -> Vec<Menu> {
-        self.props.menus.iter().map(|menu| {
-            let filtered_items = self.filter_items(&menu.items);
-            Menu {
-                name: menu.name.clone(),
-                items: filtered_items,
-            }
-        }).collect()
+    pub fn get_public_menus(&self, _language: Option<String>) -> Vec<Menu> {
+        self.props.menus.iter()
+            .filter(|menu| menu.is_active)
+            .map(|menu| {
+                let filtered_items = self.filter_items(&menu.items);
+                Menu {
+                    name: menu.name.clone(),
+                    items: filtered_items,
+                    is_active: menu.is_active,
+                }
+            }).collect()
+    }
+
+    pub fn get_filtered_tenant(&self, language: Option<String>) -> Tenant {
+        let mut tenant = self.props.clone();
+        tenant.menus = self.get_public_menus(language);
+        tenant
     }
 
     fn filter_items(&self, items: &[self::menu::MenuItem]) -> Vec<self::menu::MenuItem> {
@@ -156,8 +116,8 @@ impl<'a> TenantEntity<'a> {
             }
 
             // Validar feature
-            if let self::menu::MenuItemType::Feature(ref feature_type) = item.item_type {
-                let has_feature = match feature_type {
+            if let self::menu::MenuItemType::Feature { feature, .. } = &item.item_type {
+                let has_feature = match feature {
                     self::menu::FeatureType::Shop => self.props.features.shop,
                     self::menu::FeatureType::Blog => self.props.features.blog,
                     self::menu::FeatureType::Academy => self.props.features.academy,
@@ -183,7 +143,80 @@ impl<'a> TenantEntity<'a> {
         self.repo.save(self.props).await
     }
 
-    pub fn update_menus(&mut self, menus: Vec<Menu>) {
+    pub fn update_menus(&mut self, menus: Vec<Menu>) -> Result<(), TenantError> {
+        // Validar que solo haya un main activo
+        let active_main_count = menus.iter()
+            .filter(|m| m.name == "main" && m.is_active)
+            .count();
+
+        if active_main_count > 1 {
+            return Err(TenantError::OnlyOneActiveMainMenu);
+        }
+
         self.props.menus = menus;
+        Ok(())
+    }
+
+    pub fn add_menu(&mut self, menu: Menu) -> Result<(), TenantError> {
+        if menu.name == "main" && menu.is_active {
+            // Desactivar otros main si este se añade como activo
+            for m in self.props.menus.iter_mut() {
+                if m.name == "main" {
+                    m.is_active = false;
+                }
+            }
+        }
+        self.props.menus.push(menu);
+        Ok(())
+    }
+
+    pub fn update_specific_menu(&mut self, name: String, updated_menu: Menu) -> Result<(), TenantError> {
+        if updated_menu.name == "main" && updated_menu.is_active {
+            // Desactivar otros main
+            for m in self.props.menus.iter_mut() {
+                if m.name == "main" && m.name != name {
+                    m.is_active = false;
+                }
+            }
+        }
+
+        if let Some(pos) = self.props.menus.iter().position(|m| m.name == name) {
+            self.props.menus[pos] = updated_menu;
+            Ok(())
+        } else {
+            Err(TenantError::TenantDocNotUpdated) // O crear un error MenuNotFound
+        }
+    }
+
+    pub fn delete_menu(&mut self, name: String) -> Result<(), TenantError> {
+        self.props.menus.retain(|m| m.name != name);
+        Ok(())
+    }
+
+    pub fn update_menu_item_group_id(&mut self, menu_name: String, item_id: MenuItemID, new_group_id: String) -> Result<(), TenantError> {
+        let menu = self.props.menus.iter_mut()
+            .find(|m| m.name == menu_name)
+            .ok_or(TenantError::MenuNotFound)?;
+
+        fn find_and_update(items: &mut [MenuItem], target_id: &MenuItemID, group_id: &str) -> bool {
+            for item in items.iter_mut() {
+                if let Some(ref id) = item.id {
+                    if id == target_id {
+                        item.group_id = group_id.to_string();
+                        return true;
+                    }
+                }
+                if find_and_update(&mut item.children, target_id, group_id) {
+                    return true;
+                }
+            }
+            false
+        }
+
+        if find_and_update(&mut menu.items, &item_id, &new_group_id) {
+            Ok(())
+        } else {
+            Err(TenantError::MenuItemNotFound)
+        }
     }
 }

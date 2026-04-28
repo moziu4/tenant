@@ -32,6 +32,13 @@ async fn main() -> io::Result<()>
     };
 
     let context = Arc::new(Context::new(client.clone(), redis_cache, nats_handler));
+
+    // Arrancar suscriptor NATS para eventos de otros servicios
+    let context_for_nats = context.clone();
+    actix_web::rt::spawn(async move {
+        tenant::handlers::messages::nats_subscriber::start_nats_subscriber(context_for_nats).await;
+    });
+
     let migration_context = MigrationContext{ client: client.clone()};
     match migrate_mongo(migration_context).await {
         Ok(applied) => {

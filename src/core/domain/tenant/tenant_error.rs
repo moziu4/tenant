@@ -9,6 +9,9 @@ pub enum TenantError {
     RedisError(String),
     NotHasPermission,
     TenantMustBeInactiveToDelete,
+    OnlyOneActiveMainMenu,
+    MenuNotFound,
+    MenuItemNotFound,
 }
 
 impl std::fmt::Display for TenantError {
@@ -21,6 +24,9 @@ impl std::fmt::Display for TenantError {
             TenantError::RedisError(e) => write!(f, "Redis error: {}", e),
             TenantError::NotHasPermission => write!(f, "You do not have permission to perform this action"),
             TenantError::TenantMustBeInactiveToDelete => write!(f, "Tenant must be inactive before it can be deleted"),
+            TenantError::OnlyOneActiveMainMenu => write!(f, "Only one main menu can be active at the same time"),
+            TenantError::MenuNotFound => write!(f, "Menu not found"),
+            TenantError::MenuItemNotFound => write!(f, "Menu item not found"),
         }
     }
 }

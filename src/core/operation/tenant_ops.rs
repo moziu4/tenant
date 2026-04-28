@@ -35,7 +35,10 @@ impl<'a> TenantOps<'a> {
             let event = TenantCreatedEvent {
                 tenant_id: id.to_string(),
                 name: tenant.name.clone(),
+                available_languages: tenant.available_languages.clone(),
+                features: tenant.features.clone(),
             };
+            println!("Event: {:?}", event);
             let _ = self.nats_handler.publish_tenant_created(event).await;
         }
 
@@ -98,10 +101,10 @@ impl<'a> TenantOps<'a> {
             },
             TenantCommand::UpdateConfiguration { configuration } => entity.update_configuration(configuration.clone()),
             TenantCommand::UpdateFeatures { features } => entity.update_features(features.clone()),
-            TenantCommand::UpdateMenus { menus } => {
-                entity.update_menus(menus.clone());
-                Ok(())
-            },
+            TenantCommand::UpdateDefaultLanguage { default_language } => entity.update_default_language(default_language.clone()),
+            TenantCommand::UpdateAvailableLanguages { available_languages } => entity.update_available_languages(available_languages.clone()),
+            TenantCommand::UpdateMenus { menus } => entity.update_menus(menus.clone()),
+            TenantCommand::UpdateMenuItemGroupId { menu_name, item_id, group_id } => entity.update_menu_item_group_id(menu_name.clone(), item_id.clone(), group_id.clone()),
         }
     }
 
@@ -118,11 +121,25 @@ impl<'a> TenantOps<'a> {
         Ok(())
     }
 
-    async fn clear_cache(&self) -> Result<(), TenantError> {
-        self.redis_cache
-            .invalidate_cache("all_tenants")
+    pub async fn clear_cache(&self) -> Result<(), TenantError> {
+        let mut con = self.redis_cache.get_client().get_multiplexed_async_connection().await
+            .map_err(|e| TenantError::RedisError(e.to_string()))?;
+        
+        // Obtenemos todas las claves que empiezan por all_tenants
+        let keys: Vec<String> = redis::cmd("KEYS")
+            .arg("all_tenants*")
+            .query_async(&mut con)
             .await
             .map_err(|e| TenantError::RedisError(e.to_string()))?;
+
+        for key in keys {
+            let _: () = redis::cmd("DEL")
+                .arg(key)
+                .query_async(&mut con)
+                .await
+                .map_err(|e| TenantError::RedisError(e.to_string()))?;
+        }
+
         Ok(())
     }
 

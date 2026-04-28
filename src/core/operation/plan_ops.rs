@@ -1,3 +1,4 @@
+use crate::core::operation::tenant_ops::TenantOps;
 use crate::core::commands::plan_command::PlanCommand;
 use crate::core::domain::plans::plan_error::PlanError;
 use crate::core::domain::plans::plan_type::{Plan, NewPlan, PlanState};
@@ -19,6 +20,12 @@ impl<'a> PlanOps<'a> {
     pub async fn create_plan(&self, new_plan: NewPlan) -> Result<Plan, PlanError> {
         let entity = PlanEntity::new(new_plan, self.repo);
         let plan = entity.create().await?;
+
+        // Invalidar cache de tenants
+        let tenant_repo = self.context.get_tenant_repo();
+        let tenant_ops = TenantOps::new(&tenant_repo, self.context);
+        let _ = tenant_ops.clear_cache().await;
+
         Ok(plan)
     }
 
@@ -30,6 +37,12 @@ impl<'a> PlanOps<'a> {
         }
 
         let plan = self.repo.save(entity.get_props().clone()).await?;
+
+        // Invalidar cache de tenants ya que un cambio en el plan puede afectar a todos los tenants
+        let tenant_repo = self.context.get_tenant_repo();
+        let tenant_ops = TenantOps::new(&tenant_repo, self.context);
+        let _ = tenant_ops.clear_cache().await;
+
         Ok(plan)
     }
 

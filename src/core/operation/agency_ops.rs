@@ -30,6 +30,12 @@ impl<'a> AgencyOps<'a> {
     pub async fn create_agency(&self, new_agency: NewAgency) -> Result<Agency, AgencyError> {
         let entity = AgencyEntity::new(new_agency, self.repo);
         let agency = entity.create().await?;
+
+        // Invalidar cache de tenants
+        let tenant_repo = self.context.get_tenant_repo();
+        let tenant_ops = TenantOps::new(&tenant_repo, self.context);
+        let _ = tenant_ops.clear_cache().await;
+
         Ok(agency)
     }
 
@@ -41,6 +47,12 @@ impl<'a> AgencyOps<'a> {
         }
 
         let agency = self.repo.save(entity.get_props().clone()).await?;
+
+        // Invalidar cache de tenants ya que la agencia puede haber cambiado de estado o plan
+        let tenant_repo = self.context.get_tenant_repo();
+        let tenant_ops = TenantOps::new(&tenant_repo, self.context);
+        let _ = tenant_ops.clear_cache().await;
+
         Ok(agency)
     }
 

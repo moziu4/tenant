@@ -24,6 +24,11 @@ impl RedisCache
         Ok(Self { client: Arc::new(client) })
     }
     
+    pub fn get_client(&self) -> &Client
+    {
+        &self.client
+    }
+
     pub async fn invalidate_cache(&self, cache_key: &str) -> Result<(), RedisError>
     {
         let mut con = self.client.get_multiplexed_async_connection().await?;

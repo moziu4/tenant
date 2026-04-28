@@ -7,6 +7,7 @@ pub struct HubContext {
     pub tenant_id: String,
     pub user_id: String,
     pub user_role: String,
+    pub language: Option<String>,
 }
 
 impl FromRequest for HubContext {
@@ -29,6 +30,12 @@ impl FromRequest for HubContext {
             .unwrap_or("")
             .to_string();
 
+        // Prioridad de idioma: X-Language > Accept-Language
+        let language = req.headers().get("X-Language")
+            .or_else(|| req.headers().get("Accept-Language"))
+            .and_then(|h| h.to_str().ok())
+            .map(|s| s.to_string());
+
         // En un entorno real, aquí se podría validar que la petición provenga del Hub.
         // Pero el requerimiento dice que el Hub ya valida y confiamos si están presentes.
 
@@ -36,6 +43,7 @@ impl FromRequest for HubContext {
             tenant_id,
             user_id,
             user_role,
+            language,
         }))
     }
 }

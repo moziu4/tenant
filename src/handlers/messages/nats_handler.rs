@@ -5,6 +5,7 @@ use serde_json;
 
 #[derive(Clone)]
 pub struct NatsHandler {
+    client: async_nats::Client,
     js: JetStreamContext,
 }
 
@@ -14,7 +15,7 @@ impl NatsHandler {
         let client = async_nats::connect(nats_url).await
             .map_err(|e| format!("Failed to connect to NATS: {}", e))?;
         
-        let js = jetstream::new(client);
+        let js = jetstream::new(client.clone());
         
         // Asegurarse de que el stream TENANTS existe
         let stream_name = "TENANTS";
@@ -31,7 +32,11 @@ impl NatsHandler {
             }
         };
 
-        Ok(Self { js })
+        Ok(Self { client, js })
+    }
+
+    pub fn get_client(&self) -> async_nats::Client {
+        self.client.clone()
     }
 
     pub async fn publish_tenant_created(&self, event: TenantCreatedEvent) -> Result<(), String> {
