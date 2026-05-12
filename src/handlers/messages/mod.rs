@@ -43,6 +43,7 @@ pub struct TenantCreatedEvent {
     pub name: String,
     pub available_languages: Vec<String>,
     pub features: TenantFeatures,
+    pub agency_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

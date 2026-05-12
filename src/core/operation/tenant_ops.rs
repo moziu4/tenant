@@ -33,6 +33,7 @@ impl<'a> TenantOps<'a> {
         // Notificar creación de tenant vía NATS
         if let Some(id) = &tenant.id {
             let event = TenantCreatedEvent {
+                agency_id: tenant.agency_id.to_string(),
                 tenant_id: id.to_string(),
                 name: tenant.name.clone(),
                 available_languages: tenant.available_languages.clone(),
