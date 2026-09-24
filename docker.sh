@@ -1,16 +1,13 @@
 set -e
-suffix='' # enter version suffix
 
-if [ -z "$suffix" ]
-then
-  version=$(date +'%Y%m%d')
-  arg=$(date +'%Y.%-m.%-d')
-else
-  version=$(date +'%Y%m%d')-$suffix
-  arg=$(date +'%Y.%-m.%-d')-$suffix
-fi
+# ── Configuración reutilizable ───────────────────────────────────────────────
+DOCKER_USER="moziu4"   # nombre de usuario en Docker Hub
+SERVICE_NAME="tenant"  # nombre del servicio / repositorio
+# ─────────────────────────────────────────────────────────────────────────────
 
-tag=backend/tenant:v$version
+# TODO: soporte de versiones con fecha está preparado pero desactivado por ahora
+# Cuando se active, añadir suffix y arg aquí para etiquetar con fecha/versión.
+tag="$DOCKER_USER/$SERVICE_NAME:latest"
 
 {
   printf "Tag:  %s\n" "$tag"
@@ -30,7 +27,6 @@ tag=backend/tenant:v$version
 
 time DOCKER_BUILDKIT=1 docker build --pull \
   --ssh default="$HOME"/.ssh/id_ed25519 \
-  --build-arg IMAGE_VERSION="$arg" \
   --secret id=CARGO_CONFIG,src="$HOME"/.cargo/config.toml \
   --secret id=CARGO_CREDEN,src="$HOME"/.cargo/credentials.toml \
   -t "$tag" \
@@ -42,6 +38,11 @@ printf '\n\n> Built image:  %s\n\n' "$tag"
 select action in push rebuild exit; do
   case $action in
 
+  "push")
+  docker push "$tag"
+  break
+  ;;
+
   "rebuild")
   bash ./docker.sh
   break
@@ -50,5 +51,5 @@ select action in push rebuild exit; do
   "exit")
   break
   ;;
- esac
+  esac
 done
