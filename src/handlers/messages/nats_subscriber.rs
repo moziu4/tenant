@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 use std::sync::Arc;
 use crate::context::Context;
 use crate::handlers::messages::GroupIDCreatedEvent;
@@ -26,9 +28,9 @@ pub async fn start_nats_subscriber(context: Arc<Context>) {
                         
                         let context_clone = context.clone();
                         actix_web::rt::spawn(async move {
-                            if let Err(e) = handle_group_id_created(context_clone, event).await {
-                                error!("Error manejando GroupIDCreated: {}", e);
-                            }
+                            // if let Err(e) = handle_group_id_created(context_clone, event).await {
+                            //     error!("Error manejando GroupIDCreated: {}", e);
+                            // }
                         });
                     }
                     Err(e) => {
@@ -43,79 +45,67 @@ pub async fn start_nats_subscriber(context: Arc<Context>) {
     }
 }
 
-async fn handle_group_id_created(context: Arc<Context>, event: GroupIDCreatedEvent) -> Result<(), String> {
-    let tenant_id = TenantID::parse_str(&event.tenant_id)
-        .map_err(|e| format!("Invalid tenant_id {}: {}", event.tenant_id, e))?;
-    
-    let repo = context.get_tenant_repo();
-    let mut tenant_entity = TenantEntity::load_by_id(tenant_id, &repo).await
-        .map_err(|e| format!("Failed to load tenant {}: {:?}", event.tenant_id, e))?;
-    
-    let tenant_props = tenant_entity.get_props().clone();
-    let mut menus = tenant_props.menus.clone();
-    
-    // Si no hay menús, creamos uno básico "main"
-    if menus.is_empty() {
-        menus.push(Menu {
-            name: "main".to_string(),
-            items: Vec::new(),
-            is_active: true,
-        });
-    }
-    
-    // Identificar tipo de item basado en el slug
-    for menu in menus.iter_mut() {
-        let item_type = get_item_type_from_slug(&event.slug);
-        
-        // Evitar duplicados por group_id
-        let exists = menu.items.iter().any(|item| item.group_id == event.group_id);
-        
-        if !exists {
-            let order = menu.items.len() as i32;
-            menu.items.push(MenuItem {
-                id: None,
-                item_type,
-                order,
-                group_id: event.group_id.clone(),
-                is_visible_front: true,
-                is_visible_admin: true,
-                permissions: vec![],
-                children: vec![],
-            });
-            info!("Añadido item {} al menú {} del tenant {}", 
-                event.slug, menu.name, event.tenant_id);
-        }
-    }
-    
-    tenant_entity.update_menus(menus).map_err(|e| format!("Failed to update menus: {:?}", e))?;
-    tenant_entity.save().await.map_err(|e| format!("Failed to save tenant: {:?}", e))?;
-    
-    info!("Tenant {} actualizado con el nuevo group_id {}", event.tenant_id, event.group_id);
-    Ok(())
-}
+// async fn handle_group_id_created(context: Arc<Context>, event: GroupIDCreatedEvent) -> Result<(), String> {
+//     let tenant_id = TenantID::parse_str(&event.tenant_id)
+//         .map_err(|e| format!("Invalid tenant_id {}: {}", event.tenant_id, e))?;
+//
+//     let repo = context.get_tenant_repo();
+//     let mut tenant_entity = TenantEntity::load_by_id(tenant_id, &repo).await
+//         .map_err(|e| format!("Failed to load tenant {}: {:?}", event.tenant_id, e))?;
+//
+//     let tenant_props = tenant_entity.get_props().clone();
+//     let mut menus = tenant_props.menus.clone();
+//
+//     // Si no hay menús, creamos uno básico "main"
+//     if menus.is_empty() {
+//         menus.push(Menu {
+//             name: "main".to_string(),
+//             items: Vec::new(),
+//             is_active: true,
+//         });
+//     }
+//
+//     // Identificar tipo de item basado en el slug
+//     for menu in menus.iter_mut() {
+//         let item_type = get_item_type_from_slug(&event.slug);
+//
+//         // Evitar duplicados por group_id
+//         let exists = menu.items.iter().any(|item| item.group_id == event.group_id);
+//
+//         if !exists {
+//             let order = menu.items.len() as i32;
+//             menu.items.push(MenuItem {
+//                 id: None,
+//                 item_type,
+//                 order,
+//                 group_id: event.group_id.clone(),
+//                 is_visible_front: true,
+//                 is_visible_admin: true,
+//                 permissions: vec![],
+//                 children: vec![],
+//             });
+//             info!("Añadido item {} al menú {} del tenant {}",
+//                 event.slug, menu.name, event.tenant_id);
+//         }
+//     }
+//
+//     tenant_entity.update_menus(menus).map_err(|e| format!("Failed to update menus: {:?}", e))?;
+//     tenant_entity.save().await.map_err(|e| format!("Failed to save tenant: {:?}", e))?;
+//
+//     info!("Tenant {} actualizado con el nuevo group_id {}", event.tenant_id, event.group_id);
+//     Ok(())
+// }
 
-fn get_item_type_from_slug(slug: &str) -> MenuItemType {
-    match slug {
-        "home" => {
-            MenuItemType::Page
-        },
-        "shop" => {
-            MenuItemType::Feature { feature: FeatureType::Shop }
-        },
-        "blog" => {
-            MenuItemType::Feature { feature: FeatureType::Blog }
-        },
-        "academy" => {
-            MenuItemType::Feature { feature: FeatureType::Academy }
-        },
-        "quienes-somos" => {
-            MenuItemType::Page
-        },
-        "contacto" => {
-            MenuItemType::Page
-        },
-        _ => {
-            MenuItemType::Page
-        }
-    }
-}
+// fn get_item_type_from_slug(slug: &str) -> MenuItemType {
+//     match slug {
+//         "home" => {
+//             MenuItemType::Page
+//         },
+//         "migration" => {
+//             MenuItemType::Feature { feature: FeatureType::Migration }
+//         },
+//         _ => {
+//             MenuItemType::Page
+//         }
+//     }
+// }

@@ -12,6 +12,16 @@ pub enum TenantError {
     OnlyOneActiveMainMenu,
     MenuNotFound,
     MenuItemNotFound,
+    FeatureNotAllowedByPlan(String),
+    FeatureNotAllowedByTenantPlan(String),
+    TenantLimitReached,
+    OrganizationNotFound,
+    OrganizationInactive,
+    PlanNotFound,
+    TenantPlanNotFound,
+    TenantPlanInactive,
+    TenantPlanNotAllowedForOrganization,
+    InvalidTenantPlan(String),
 }
 
 impl std::fmt::Display for TenantError {
@@ -27,6 +37,16 @@ impl std::fmt::Display for TenantError {
             TenantError::OnlyOneActiveMainMenu => write!(f, "Only one main menu can be active at the same time"),
             TenantError::MenuNotFound => write!(f, "Menu not found"),
             TenantError::MenuItemNotFound => write!(f, "Menu item not found"),
+            TenantError::FeatureNotAllowedByPlan(feature) => write!(f, "Feature '{}' is not allowed by the organization's plan", feature),
+            TenantError::FeatureNotAllowedByTenantPlan(feature) => write!(f, "Feature '{}' is not allowed by the tenant's plan", feature),
+            TenantError::TenantLimitReached => write!(f, "Tenant limit reached for this organization's plan"),
+            TenantError::OrganizationNotFound => write!(f, "Organization not found"),
+            TenantError::OrganizationInactive => write!(f, "Organization is inactive"),
+            TenantError::PlanNotFound => write!(f, "Plan not found"),
+            TenantError::TenantPlanNotFound => write!(f, "Tenant plan not found"),
+            TenantError::TenantPlanInactive => write!(f, "Tenant plan is inactive"),
+            TenantError::TenantPlanNotAllowedForOrganization => write!(f, "Tenant plan is not assigned to this organization"),
+            TenantError::InvalidTenantPlan(msg) => write!(f, "Invalid tenant plan: {}", msg),
         }
     }
 }

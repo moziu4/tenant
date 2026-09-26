@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct AgencyID(ObjectId);
+pub struct OrganizationID(ObjectId);
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -63,12 +63,12 @@ macro_rules! implement_id {
     };
 }
 
-implement_id!(AgencyID);
+implement_id!(OrganizationID);
 implement_id!(TenantID);
 implement_id!(PlanID);
 implement_id!(MenuItemID);
 
-impl std::fmt::Display for AgencyID
+impl std::fmt::Display for OrganizationID
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {

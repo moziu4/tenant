@@ -33,11 +33,11 @@ async fn main() -> io::Result<()>
 
     let context = Arc::new(Context::new(client.clone(), redis_cache, nats_handler));
 
-    // Arrancar suscriptor NATS para eventos de otros servicios
-    let context_for_nats = context.clone();
-    actix_web::rt::spawn(async move {
-        tenant::handlers::messages::nats_subscriber::start_nats_subscriber(context_for_nats).await;
-    });
+    // Arrancar suscriptor NATS para eventos de otros servicios (deshabilitado temporalmente)
+    // let context_for_nats = context.clone();
+    // actix_web::rt::spawn(async move {
+    //     tenant::handlers::messages::nats_subscriber::start_nats_subscriber(context_for_nats).await;
+    // });
 
     let migration_context = MigrationContext{ client: client.clone()};
     match migrate_mongo(migration_context).await {
@@ -68,7 +68,7 @@ async fn main() -> io::Result<()>
                                        .max_age(3600))
                   .app_data(web::Data::new(context.clone()))
                   .configure(http::tenant::tenant_routes::config)
-                  .configure(http::agency::agency_routes::config)
+                  .configure(http::organization::organization_routes::config)
                   .configure(http::plan::plan_routes::config)
                   .configure(http::catalog::config)
     }).bind(env::var("HTTP_BIND").unwrap().to_string())?

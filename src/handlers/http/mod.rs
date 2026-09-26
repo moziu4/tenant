@@ -1,4 +1,4 @@
 pub mod tenant;
-pub mod agency;
+pub mod organization;
 pub mod plan;
 pub mod catalog;

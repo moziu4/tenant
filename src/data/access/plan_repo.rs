@@ -6,8 +6,8 @@ use mongodb::{
 };
 
 use crate::core::domain::plans::plan_error::PlanError;
-use crate::core::domain::plans::plan_type::Plan;
-use crate::utils::domains_ids::PlanID;
+use crate::core::domain::plans::plan_type::{Plan, PlanTarget};
+use crate::utils::domains_ids::{PlanID, OrganizationID};
 
 #[derive(Clone)]
 pub struct MongoPlanRepo
@@ -35,9 +35,43 @@ impl MongoPlanRepo
         Ok(new_plan)
     }
 
-    pub async fn fetch_all(&self) -> Result<Vec<Plan>, PlanError>
+    pub async fn fetch_all(&self, target: Option<PlanTarget>, organization_id: Option<OrganizationID>) -> Result<Vec<Plan>, PlanError>
     {
-        let filter = doc! {};
+        let mut filter = doc! {};
+
+        if let Some(target_val) = target {
+            match target_val {
+                PlanTarget::Organization => {
+                    filter.insert("$or", bson::Bson::Array(vec![
+                        doc! { "target": "organization" }.into(),
+                        doc! { "target": { "$exists": false } }.into(),
+                    ]));
+                },
+                PlanTarget::Tenant => {
+                    filter.insert("target", "tenant");
+                }
+            }
+        }
+
+        if let Some(org_id) = organization_id {
+            let org_filter = bson::Bson::Array(vec![
+                doc! { "organization_id": ObjectId::from(org_id) }.into(),
+                doc! { "organization_id": bson::Bson::Null }.into(),
+                doc! { "organization_id": { "$exists": false } }.into(),
+            ]);
+
+            if filter.contains_key("$or") {
+                // Si ya había un $or (por organization target), combinamos con $and
+                let existing_or = filter.remove("$or").unwrap();
+                filter.insert("$and", bson::Bson::Array(vec![
+                    doc! { "$or": existing_or }.into(),
+                    doc! { "$or": org_filter }.into(),
+                ]));
+            } else {
+                filter.insert("$or", org_filter);
+            }
+        }
+
         let mut cursor = self.collection
             .find(filter)
             .await

@@ -19,7 +19,7 @@ impl NatsHandler {
         
         // Asegurarse de que el stream TENANTS existe
         let stream_name = "TENANTS";
-        let subjects = vec!["tenant.created".to_string(), "tenant.state.*".to_string(), "agency.state.*".to_string()];
+        let subjects = vec!["tenant.created".to_string(), "tenant.state.*".to_string(), "organization.state.*".to_string()];
 
         let _stream = match js.get_stream(stream_name).await {
             Ok(stream) => stream,
@@ -53,7 +53,7 @@ impl NatsHandler {
     pub async fn publish_state_changed(&self, event: StateChangedEvent) -> Result<(), String> {
         let subject = match event.entity_type {
             crate::handlers::messages::EntityType::Tenant => format!("tenant.state.{}", event.entity_id),
-            crate::handlers::messages::EntityType::Agency => format!("agency.state.{}", event.entity_id),
+            crate::handlers::messages::EntityType::Organization => format!("organization.state.{}", event.entity_id),
         };
 
         let payload = serde_json::to_vec(&event)

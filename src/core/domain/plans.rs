@@ -2,8 +2,8 @@ pub mod plan_type;
 pub mod plan_error;
 
 use crate::data::access::plan_repo::MongoPlanRepo;
-use crate::utils::domains_ids::PlanID;
-use self::plan_type::{Plan, NewPlan, PlanState, PlanFeatures};
+use crate::utils::domains_ids::{PlanID, OrganizationID};
+use self::plan_type::{Plan, NewPlan, PlanState, PlanFeatures, PlanTarget, BillingStrategy};
 use self::plan_error::PlanError;
 
 pub struct PlanEntity<'a> {
@@ -23,6 +23,9 @@ impl<'a> PlanEntity<'a> {
                 limit_users: new_plan.limit_users,
                 state: new_plan.state,
                 features: new_plan.features,
+                target: new_plan.target,
+                organization_id: new_plan.organization_id,
+                billing_strategy: new_plan.billing_strategy,
             },
         }
     }
@@ -62,6 +65,24 @@ impl<'a> PlanEntity<'a> {
 
     pub fn update_features(&mut self, features: PlanFeatures) -> Result<(), PlanError> {
         self.props.features = features;
+        Ok(())
+    }
+
+    pub fn update_target(&mut self, target: PlanTarget) -> Result<(), PlanError> {
+        self.props.target = target;
+        Ok(())
+    }
+
+    pub fn update_organization_id(&mut self, organization_id: Option<OrganizationID>) -> Result<(), PlanError> {
+        self.props.organization_id = organization_id;
+        Ok(())
+    }
+
+    pub fn update_billing_strategy(&mut self, billing_strategy: Option<BillingStrategy>) -> Result<(), PlanError> {
+        if let Some(ref strategy) = billing_strategy {
+            strategy.validate().map_err(PlanError::InvalidBillingStrategy)?;
+        }
+        self.props.billing_strategy = billing_strategy;
         Ok(())
     }
 

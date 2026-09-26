@@ -4,7 +4,7 @@ use redis::{AsyncCommands, Client, RedisError};
 use serde_json;
 
 use crate::{
-    core::domain::{tenant::tenant_type::Tenant, agency::agency_type::Agency},
+    core::domain::tenant::tenant_type::Tenant,
     utils::cache_error::CacheError,
 };
 

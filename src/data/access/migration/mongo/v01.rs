@@ -15,7 +15,7 @@ impl Migration for Migration001 {
         let db = context.client.database(&db_name);
 
         // Crear colecciones
-        let collections = vec!["agency", "tenant", "migrations", "plans"];
+        let collections = vec!["organization", "tenant", "migrations", "plans"];
         
         for coll_name in collections {
             // MongoDB crea las colecciones automáticamente al insertar, 

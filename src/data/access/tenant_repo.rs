@@ -7,7 +7,7 @@ use mongodb::{
 
 use crate::core::domain::tenant::tenant_error::TenantError;
 use crate::core::domain::tenant::tenant_type::Tenant;
-use crate::utils::domains_ids::{AgencyID, TenantID};
+use crate::utils::domains_ids::{OrganizationID, TenantID};
 
 #[derive(Clone)]
 pub struct MongoTenantRepo
@@ -35,14 +35,14 @@ impl MongoTenantRepo
         Ok(new_tenant)
     }
 
-    pub async fn fetch_all(&self, host: Option<String>, agency_id: Option<AgencyID>) -> Result<Vec<Tenant>, TenantError>
+    pub async fn fetch_all(&self, host: Option<String>, organization_id: Option<OrganizationID>) -> Result<Vec<Tenant>, TenantError>
     {
         let mut filter = doc! {};
         if let Some(h) = host {
             filter.insert("host", h.trim());
         }
-        if let Some(aid) = agency_id {
-            filter.insert("agency_id", ObjectId::from(aid));
+        if let Some(oid) = organization_id {
+            filter.insert("organization_id", ObjectId::from(oid));
         }
         let mut cursor = self.collection
             .find(filter)

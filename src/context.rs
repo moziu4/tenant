@@ -4,7 +4,7 @@ use mongodb::{bson::Document, Client, Collection};
 
 use crate::{
     data::access::{
-        agency_repo::MongoAgencyRepo,
+        organization_repo::MongoOrganizationRepo,
         tenant_repo::MongoTenantRepo,
         plan_repo::MongoPlanRepo,
     },
@@ -15,12 +15,12 @@ use crate::{
 #[derive(Clone)]
 pub struct Context
 {
-    pub client:    Arc<Client>,
-    agency_repo:  Arc<MongoAgencyRepo>,
-    tenant_repo:  Arc<MongoTenantRepo>,
-    plan_repo:    Arc<MongoPlanRepo>,
-    redis_cache:   Arc<RedisCache>,
-    nats_handler: Arc<NatsHandler>,
+    pub client:        Arc<Client>,
+    organization_repo: Arc<MongoOrganizationRepo>,
+    tenant_repo:       Arc<MongoTenantRepo>,
+    plan_repo:         Arc<MongoPlanRepo>,
+    redis_cache:       Arc<RedisCache>,
+    nats_handler:      Arc<NatsHandler>,
 }
 
 
@@ -31,24 +31,24 @@ impl Context
         let arc_client = Arc::new(client);
         let db_name = env::var("MONGO_DATABASE").expect("Var MONGO_DATABASE no definida");
         
-        let agency_collection = arc_client.database(&db_name).collection("agency");
+        let organization_collection = arc_client.database(&db_name).collection("organization");
         let tenant_collection = arc_client.database(&db_name).collection("tenant");
         let plan_collection = arc_client.database(&db_name).collection("plan");
 
         Self { 
-               client:        arc_client.clone(),
-               agency_repo:  Arc::new(MongoAgencyRepo::new(agency_collection)),
-               tenant_repo:  Arc::new(MongoTenantRepo::new(tenant_collection)),
-               plan_repo:    Arc::new(MongoPlanRepo::new(plan_collection)),
-               redis_cache:   Arc::new(redis_cache), 
-               nats_handler: Arc::new(nats_handler),
+               client:            arc_client.clone(),
+               organization_repo: Arc::new(MongoOrganizationRepo::new(organization_collection)),
+               tenant_repo:       Arc::new(MongoTenantRepo::new(tenant_collection)),
+               plan_repo:         Arc::new(MongoPlanRepo::new(plan_collection)),
+               redis_cache:       Arc::new(redis_cache), 
+               nats_handler:      Arc::new(nats_handler),
         }
     }
 
 
-    pub fn get_agency_repo(&self) -> Arc<MongoAgencyRepo>
+    pub fn get_organization_repo(&self) -> Arc<MongoOrganizationRepo>
     {
-        Arc::clone(&self.agency_repo)
+        Arc::clone(&self.organization_repo)
     }
 
     pub fn get_tenant_repo(&self) -> Arc<MongoTenantRepo>

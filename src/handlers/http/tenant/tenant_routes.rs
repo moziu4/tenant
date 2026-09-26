@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 use std::sync::Arc;
 
 use actix_web::{
@@ -18,14 +20,13 @@ use crate::{
         commands::tenant_command::TenantCommand,
         domain::tenant::{
             tenant_error::TenantError,
-            tenant_type::{LoadTenantsByAgency, NewTenant},
+            tenant_type::{LoadTenantsByOrganization, NewTenant},
             menu::Menu,
             TenantEntity,
         },
         operation::tenant_ops::TenantOps,
     },
-    data::access::tenant_repo::MongoTenantRepo,
-    utils::domains_ids::{AgencyID, TenantID},
+    utils::domains_ids::TenantID,
 };
 
 #[rustfmt::skip]
@@ -35,30 +36,32 @@ pub fn config(cfg: &mut web::ServiceConfig)
         web::scope("/api/tenant")
             .route("",                      web::post().to(create_tenant))
             .route("/all",          web::get().to(load_all_tenants))
-            .route("/by_agency",    web::post().to(load_tenants_by_agency))
+            .route("/by_organization", web::post().to(load_tenants_by_organization))
             .route("/info",         web::get().to(get_tenant_by_host))
-            .route("/menus/public", web::get().to(get_public_menus))
-            .route("/menus",        web::get().to(get_all_menus))
-            .route("/menus",        web::post().to(add_menu))
-            .route("/menus/{name}", web::patch().to(update_menu))
-            .route("/menus/{name}", web::delete().to(delete_menu))
-            .route("/{id}/menus/public", web::get().to(get_public_menus_with_id))
-            .route("/{id}/menus",        web::get().to(get_all_menus_with_id))
-            .route("/{id}/menus",        web::post().to(add_menu_with_id))
-            .route("/{id}/menus/{name}", web::patch().to(update_menu_with_id))
-            .route("/{id}/menus/{name}", web::delete().to(delete_menu_with_id))
+            // Endpoints de menús deshabilitados temporalmente
+            // .route("/menus/public", web::get().to(get_public_menus))
+            // .route("/menus",        web::get().to(get_all_menus))
+            // .route("/menus",        web::post().to(add_menu))
+            // .route("/menus/{name}", web::patch().to(update_menu))
+            // .route("/menus/{name}", web::delete().to(delete_menu))
+            // .route("/{id}/menus/public", web::get().to(get_public_menus_with_id))
+            // .route("/{id}/menus",        web::get().to(get_all_menus_with_id))
+            // .route("/{id}/menus",        web::post().to(add_menu_with_id))
+            // .route("/{id}/menus/{name}", web::patch().to(update_menu_with_id))
+            // .route("/{id}/menus/{name}", web::delete().to(delete_menu_with_id))
             .route("/{id}",         web::get().to(get_tenant_by_id))
             .route("/{id}",         web::patch().to(dispatch_commands))
             .route("/{id}",         web::delete().to(delete_tenant_by_id)),
     );
-    cfg.service(
-        web::scope("/api/{id}/menus")
-            .route("/public", web::get().to(get_public_menus_with_id))
-            .route("",        web::get().to(get_all_menus_with_id))
-            .route("",        web::post().to(add_menu_with_id))
-            .route("/{name}", web::patch().to(update_menu_with_id))
-            .route("/{name}", web::delete().to(delete_menu_with_id)),
-    );
+    // Scope de menús deshabilitado temporalmente
+    // cfg.service(
+    //     web::scope("/api/{id}/menus")
+    //         .route("/public", web::get().to(get_public_menus_with_id))
+    //         .route("",        web::get().to(get_all_menus_with_id))
+    //         .route("",        web::post().to(add_menu_with_id))
+    //         .route("/{name}", web::patch().to(update_menu_with_id))
+    //         .route("/{name}", web::delete().to(delete_menu_with_id)),
+    // );
 }
 
 use crate::utils::hub_context::HubContext;
@@ -143,13 +146,13 @@ async fn load_all_tenants(req: HttpRequest,
     }
 }
 
-async fn load_tenants_by_agency(req: HttpRequest,
-                               _hub_ctx: HubContext,
-                               context: web::Data<Arc<Context>>,
-                               payload: Json<LoadTenantsByAgency>) -> impl Responder
+async fn load_tenants_by_organization(req: HttpRequest,
+                                     _hub_ctx: HubContext,
+                                     context: web::Data<Arc<Context>>,
+                                     payload: Json<LoadTenantsByOrganization>) -> impl Responder
 {
     let secret = env::var("SECRET_KEY").expect("SECRET_KEY not found");
-    // Usamos el mismo permiso de lectura global o propio para agencias
+    // Usamos el mismo permiso de lectura global o propio para organizaciones
     if !has_permission(secret, req, TENANT_READ_GLOBAL).await
     {
         return HttpResponse::Forbidden().body("No permission");
@@ -158,11 +161,11 @@ async fn load_tenants_by_agency(req: HttpRequest,
     let tenant_repo = context.get_ref().get_tenant_repo();
     let tenant_ops = TenantOps::new(&tenant_repo, &context);
 
-    let agency_id = payload.into_inner().agency_id;
+    let organization_id = payload.into_inner().organization_id;
 
-    // Para buscar por agencia, ignoramos el filtro de host que viene del Hub
-    // para que devuelva todos los tenants de esa agencia.
-    match tenant_ops.load_all_tenants(None, Some(agency_id)).await
+    // Para buscar por organizacion, ignoramos el filtro de host que viene del Hub
+    // para que devuelva todos los tenants de esa organizacion.
+    match tenant_ops.load_all_tenants(None, Some(organization_id)).await
     {
         Ok(tenants) => HttpResponse::Ok().json(tenants),
         Err(err) => HttpResponse::InternalServerError().json(err.to_string()),

@@ -1,8 +1,5 @@
 use std::sync::Arc;
 use actix_web::{web, HttpResponse, Responder, HttpRequest};
-use std::env;
-use perms::has_permission;
-use crate::core::domain::perms_cat::PLAN_READ_OWN;
 use crate::context::Context;
 use crate::data::catalog_importer::CatalogImporter;
 

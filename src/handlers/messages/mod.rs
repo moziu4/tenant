@@ -25,7 +25,7 @@ where
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum EntityType {
     Tenant,
-    Agency,
+    Organization,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -43,7 +43,9 @@ pub struct TenantCreatedEvent {
     pub name: String,
     pub available_languages: Vec<String>,
     pub features: TenantFeatures,
-    pub agency_id: String,
+    pub organization_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

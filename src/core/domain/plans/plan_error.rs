@@ -10,6 +10,9 @@ pub enum PlanError {
     NotHasPermission,
     PlanInUse,
     PlanMustBeInactiveToDelete,
+    InvalidBillingStrategy(String),
+    OrganizationNotFound,
+    InvalidPlanTarget(String),
 }
 
 impl std::fmt::Display for PlanError {
@@ -23,6 +26,9 @@ impl std::fmt::Display for PlanError {
             PlanError::NotHasPermission => write!(f, "You do not have permission to perform this action"),
             PlanError::PlanInUse => write!(f, "Plan is in use and cannot be modified or deleted"),
             PlanError::PlanMustBeInactiveToDelete => write!(f, "Plan must be inactive before it can be deleted"),
+            PlanError::InvalidBillingStrategy(msg) => write!(f, "Invalid billing strategy: {}", msg),
+            PlanError::OrganizationNotFound => write!(f, "Organization not found for this tenant plan"),
+            PlanError::InvalidPlanTarget(msg) => write!(f, "Invalid plan target: {}", msg),
         }
     }
 }

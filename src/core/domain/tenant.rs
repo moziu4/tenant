@@ -3,7 +3,7 @@ pub mod tenant_error;
 pub mod menu;
 
 use crate::data::access::tenant_repo::MongoTenantRepo;
-use crate::utils::domains_ids::{TenantID, MenuItemID};
+use crate::utils::domains_ids::{TenantID, MenuItemID, PlanID};
 use self::tenant_type::{Tenant, NewTenant, TenantState, TenantFeatures, TenantConfiguration};
 use self::menu::{Menu, MenuItem};
 use self::tenant_error::TenantError;
@@ -27,7 +27,8 @@ impl<'a> TenantEntity<'a> {
                 id: None,
                 host: new_tenant.host,
                 name: new_tenant.name,
-                agency_id: new_tenant.agency_id,
+                organization_id: new_tenant.organization_id,
+                plan_id: new_tenant.plan_id,
                 configuration: new_tenant.configuration,
                 state: new_tenant.state,
                 features: new_tenant.features,
@@ -57,6 +58,11 @@ impl<'a> TenantEntity<'a> {
             return Err(TenantError::EmptyName);
         }
         self.props.name = name;
+        Ok(())
+    }
+
+    pub fn update_plan_id(&mut self, plan_id: Option<PlanID>) -> Result<(), TenantError> {
+        self.props.plan_id = plan_id;
         Ok(())
     }
 
@@ -118,9 +124,7 @@ impl<'a> TenantEntity<'a> {
             // Validar feature
             if let self::menu::MenuItemType::Feature { feature, .. } = &item.item_type {
                 let has_feature = match feature {
-                    self::menu::FeatureType::Shop => self.props.features.shop,
-                    self::menu::FeatureType::Blog => self.props.features.blog,
-                    self::menu::FeatureType::Academy => self.props.features.academy,
+                    self::menu::FeatureType::Migration => self.props.features.migration,
                 };
                 if !has_feature {
                     continue;

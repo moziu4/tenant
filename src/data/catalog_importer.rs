@@ -1,7 +1,6 @@
 use std::env;
 use std::fs;
 use std::sync::Arc;
-use mongodb::bson::Document;
 use serde::{Deserialize, Serialize};
 use crate::context::Context;
 

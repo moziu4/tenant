@@ -4,9 +4,7 @@ use crate::utils::domains_ids::MenuItemID;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum FeatureType {
-    Shop,
-    Blog,
-    Academy,
+    Migration
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
