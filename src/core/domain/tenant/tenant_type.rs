@@ -33,6 +33,8 @@ pub struct Tenant {
     pub plan_id: Option<PlanID>,
     pub configuration: TenantConfiguration,
     pub state: TenantState,
+    #[serde(default)]
+    pub registration_type: RegistrationType,
     pub features: TenantFeatures,
     #[serde(default)]
     pub default_language: String,
@@ -48,6 +50,19 @@ pub enum TenantState {
     Active,
     Inactive,
     Trial,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum RegistrationType {
+    SelfService,
+    Deplinking,
+}
+
+impl Default for RegistrationType {
+    fn default() -> Self {
+        RegistrationType::SelfService
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -74,6 +89,8 @@ pub struct NewTenant {
     pub plan_id: Option<PlanID>,
     pub configuration: TenantConfiguration,
     pub state: TenantState,
+    #[serde(default)]
+    pub registration_type: RegistrationType,
     pub features: TenantFeatures,
     #[serde(default)]
     pub default_language: String,
@@ -113,11 +130,25 @@ mod tests {
         };
 
         let tenant_features = TenantFeatures {
-            migration: false,
+            migration: true,
         };
 
         let res = tenant_features.validate_against_plan(&plan_features);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_validate_against_plan_both_disabled_allowed() {
+        let plan_features = PlanFeatures {
+            migration: false,
+        };
+
+        let tenant_features = TenantFeatures {
+            migration: false,
+        };
+
+        let res = tenant_features.validate_against_plan(&plan_features);
+        assert!(res.is_ok());
     }
 
     #[test]
@@ -132,6 +163,14 @@ mod tests {
 
         let res = tenant_features.validate_against_plan(&plan_features);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_tenant_deserialization_with_registration_type() {
+        let json = "{\"host\":\"my-tenant.example.com\",\"name\":\"My Tenant\",\"organization_id\":\"507f1f77bcf86cd799439011\",\"configuration\":{\"logo\":\"\",\"colors\":{\"primary\":\"#fff\",\"secondary\":\"#000\",\"accent\":\"#f00\",\"background\":\"#eee\",\"text\":\"#111\"},\"theme\":\"\",\"menu_type\":\"\"},\"state\":\"active\",\"registration_type\":\"deplinking\",\"features\":{}}";
+
+        let new_tenant: NewTenant = serde_json::from_str(json).expect("Should deserialize with registration_type");
+        assert_eq!(new_tenant.registration_type, RegistrationType::Deplinking);
     }
 
     #[test]

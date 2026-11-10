@@ -45,12 +45,17 @@ impl<'a> TenantOps<'a> {
             .await
             .map_err(|_| TenantError::PlanNotFound)?;
 
+        if org_plan.state == crate::core::domain::plans::plan_type::PlanState::Inactive {
+            return Err(TenantError::PlanNotFound);
+        }
+
         new_tenant.features.validate_against_plan(&org_plan.features)?;
 
         // 3. Validar límite de tenants si aplica (limit_tenant > 0)
-        if org_plan.limit_tenant > 0 {
+        if org_plan.limit_tenant > 0 && new_tenant.state == TenantState::Active {
             let existing_tenants = self.repo.fetch_all(None, Some(new_tenant.organization_id.clone())).await?;
-            if existing_tenants.len() >= org_plan.limit_tenant as usize {
+            let active_count = existing_tenants.iter().filter(|t| t.state == TenantState::Active).count();
+            if (active_count as i32) >= org_plan.limit_tenant {
                 return Err(TenantError::TenantLimitReached);
             }
         }
@@ -74,6 +79,10 @@ impl<'a> TenantOps<'a> {
                     return Err(TenantError::TenantPlanNotAllowedForOrganization);
                 }
             }
+
+            // Validar que las features del plan de tenant están permitidas por el plan de la organización
+            tenant_plan.features.validate_against_plan(&org_plan.features)
+                .map_err(TenantError::FeatureNotAllowedByPlan)?;
 
             // Validar que las features del tenant están permitidas por el plan de tenant
             new_tenant.features.validate_against_plan(&tenant_plan.features)
@@ -152,6 +161,55 @@ impl<'a> TenantOps<'a> {
                     if org.state == crate::core::commands::organization_command::OrganizationState::Inactive {
                         return Err(TenantError::OrganizationInactive);
                     }
+
+                    // Validar que el plan de la organización existe, está activo y permite las features
+                    let plan_repo = self.context.get_plan_repo();
+                    let org_plan = plan_repo.fetch_by_id(org.plan.clone())
+                        .await
+                        .map_err(|_| TenantError::PlanNotFound)?;
+
+                    if org_plan.state == crate::core::domain::plans::plan_type::PlanState::Inactive {
+                        return Err(TenantError::PlanNotFound);
+                    }
+
+                    entity.get_props().features.validate_against_plan(&org_plan.features)?;
+
+                    // Validar límite de tenants si aplica (limit_tenant > 0)
+                    if org_plan.limit_tenant > 0 {
+                        let existing_tenants = self.repo.fetch_all(None, Some(entity.get_props().organization_id.clone())).await?;
+                        let current_id = entity.get_props().id.as_ref();
+                        let active_count = existing_tenants.iter().filter(|t| t.state == TenantState::Active && t.id.as_ref() != current_id).count();
+                        if (active_count as i32) >= org_plan.limit_tenant {
+                            return Err(TenantError::TenantLimitReached);
+                        }
+                    }
+
+                    // Si el tenant tiene un plan propio asignado, validar también contra él y contra org_plan
+                    if let Some(ref tenant_plan_id) = entity.get_props().plan_id {
+                        let tenant_plan = plan_repo.fetch_by_id(tenant_plan_id.clone())
+                            .await
+                            .map_err(|_| TenantError::TenantPlanNotFound)?;
+
+                        if tenant_plan.target != crate::core::domain::plans::plan_type::PlanTarget::Tenant {
+                            return Err(TenantError::InvalidTenantPlan("Selected plan is not a tenant plan".to_string()));
+                        }
+
+                        if tenant_plan.state == crate::core::domain::plans::plan_type::PlanState::Inactive {
+                            return Err(TenantError::TenantPlanInactive);
+                        }
+
+                        if let Some(ref allowed_org_id) = tenant_plan.organization_id {
+                            if *allowed_org_id != entity.get_props().organization_id {
+                                return Err(TenantError::TenantPlanNotAllowedForOrganization);
+                            }
+                        }
+
+                        tenant_plan.features.validate_against_plan(&org_plan.features)
+                            .map_err(TenantError::FeatureNotAllowedByPlan)?;
+
+                        entity.get_props().features.validate_against_plan(&tenant_plan.features)
+                            .map_err(|_| TenantError::FeatureNotAllowedByTenantPlan("Feature not allowed by tenant plan".to_string()))?;
+                    }
                 }
 
                 entity.update_state(state.clone())?;
@@ -166,6 +224,7 @@ impl<'a> TenantOps<'a> {
                 }
                 Ok(())
             },
+            TenantCommand::UpdateRegistrationType { registration_type } => entity.update_registration_type(registration_type.clone()),
             TenantCommand::UpdateConfiguration { configuration } => entity.update_configuration(configuration.clone()),
             TenantCommand::UpdateFeatures { features } => {
                 // Validar que las features están permitidas por el plan de la organización
@@ -213,6 +272,18 @@ impl<'a> TenantOps<'a> {
                             return Err(TenantError::TenantPlanNotAllowedForOrganization);
                         }
                     }
+
+                    let organization_repo = self.context.get_organization_repo();
+                    let org = organization_repo.fetch_by_id(entity.get_props().organization_id.clone())
+                        .await
+                        .map_err(|_| TenantError::OrganizationNotFound)?;
+
+                    let org_plan = plan_repo.fetch_by_id(org.plan.clone())
+                        .await
+                        .map_err(|_| TenantError::PlanNotFound)?;
+
+                    tenant_plan.features.validate_against_plan(&org_plan.features)
+                        .map_err(TenantError::FeatureNotAllowedByPlan)?;
 
                     // Validar que las features actuales del tenant son compatibles con el nuevo plan
                     entity.get_props().features.validate_against_plan(&tenant_plan.features)

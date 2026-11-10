@@ -9,6 +9,9 @@ pub enum OrganizationError {
     RedisError(String),
     NotHasPermission,
     OrganizationMustBeInactiveToDelete,
+    PlanNotFound,
+    PlanInactive,
+    InvalidPlan(String),
 }
 
 impl std::fmt::Display for OrganizationError {
@@ -21,6 +24,9 @@ impl std::fmt::Display for OrganizationError {
             OrganizationError::RedisError(e) => write!(f, "Redis error: {}", e),
             OrganizationError::NotHasPermission => write!(f, "You do not have permission to perform this action"),
             OrganizationError::OrganizationMustBeInactiveToDelete => write!(f, "Organization must be inactive before it can be deleted"),
+            OrganizationError::PlanNotFound => write!(f, "Organization plan not found"),
+            OrganizationError::PlanInactive => write!(f, "Organization plan is inactive"),
+            OrganizationError::InvalidPlan(msg) => write!(f, "Invalid organization plan: {}", msg),
         }
     }
 }

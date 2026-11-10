@@ -26,7 +26,7 @@ pub async fn start_nats_subscriber(context: Arc<Context>) {
                         info!("Recibido evento GroupIDCreated: tenant_id={}, slug={}, group_id={}", 
                             event.tenant_id, event.slug, event.group_id);
                         
-                        let context_clone = context.clone();
+                        let _context_clone = context.clone();
                         actix_web::rt::spawn(async move {
                             // if let Err(e) = handle_group_id_created(context_clone, event).await {
                             //     error!("Error manejando GroupIDCreated: {}", e);

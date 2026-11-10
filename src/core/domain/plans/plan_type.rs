@@ -78,6 +78,15 @@ pub struct PlanFeatures {
     pub migration: bool,
 }
 
+impl PlanFeatures {
+    pub fn validate_against_plan(&self, parent_plan_features: &PlanFeatures) -> Result<(), String> {
+        if self.migration && !parent_plan_features.migration {
+            return Err("migration".to_string());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NewPlan {
     pub name: String,
@@ -140,6 +149,20 @@ mod tests {
         assert_eq!(plan.target, PlanTarget::Organization);
         assert!(plan.organization_id.is_none());
         assert!(plan.billing_strategy.is_none());
+    }
+
+    #[test]
+    fn test_plan_features_validate_against_plan() {
+        let parent_with_migration = PlanFeatures { migration: true };
+        let parent_without_migration = PlanFeatures { migration: false };
+
+        let child_with_migration = PlanFeatures { migration: true };
+        let child_without_migration = PlanFeatures { migration: false };
+
+        assert!(child_with_migration.validate_against_plan(&parent_with_migration).is_ok());
+        assert!(child_without_migration.validate_against_plan(&parent_with_migration).is_ok());
+        assert!(child_without_migration.validate_against_plan(&parent_without_migration).is_ok());
+        assert!(child_with_migration.validate_against_plan(&parent_without_migration).is_err());
     }
 
     #[test]

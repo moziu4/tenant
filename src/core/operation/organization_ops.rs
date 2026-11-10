@@ -28,6 +28,20 @@ impl<'a> OrganizationOps<'a> {
     }
 
     pub async fn create_organization(&self, new_organization: NewOrganization) -> Result<Organization, OrganizationError> {
+        // Validar que el plan de la organización existe, está activo y su target es Organization
+        let plan_repo = self.context.get_plan_repo();
+        let plan = plan_repo.fetch_by_id(new_organization.plan.clone())
+            .await
+            .map_err(|_| OrganizationError::PlanNotFound)?;
+
+        if plan.target != crate::core::domain::plans::plan_type::PlanTarget::Organization {
+            return Err(OrganizationError::InvalidPlan("Plan is not an organization plan".to_string()));
+        }
+
+        if plan.state == crate::core::domain::plans::plan_type::PlanState::Inactive {
+            return Err(OrganizationError::PlanInactive);
+        }
+
         let entity = OrganizationEntity::new(new_organization, self.repo);
         let organization = entity.create().await?;
 
@@ -59,7 +73,30 @@ impl<'a> OrganizationOps<'a> {
     async fn dispatch_command(&self, entity: &mut OrganizationEntity<'a>, command: &OrganizationCommand) -> Result<(), OrganizationError> {
         match command {
             OrganizationCommand::UpdateName { name } => entity.update_name(name.clone()),
-            OrganizationCommand::UpdatePlan { plan } => entity.update_plan(plan.clone()),
+            OrganizationCommand::UpdatePlan { plan } => {
+                let old_plan_id = entity.get_props().plan.clone();
+                let plan_repo = self.context.get_plan_repo();
+                let new_plan = plan_repo.fetch_by_id(plan.clone())
+                    .await
+                    .map_err(|_| OrganizationError::PlanNotFound)?;
+
+                if new_plan.target != crate::core::domain::plans::plan_type::PlanTarget::Organization {
+                    return Err(OrganizationError::InvalidPlan("Selected plan is not an organization plan".to_string()));
+                }
+
+                if new_plan.state == crate::core::domain::plans::plan_type::PlanState::Inactive {
+                    return Err(OrganizationError::PlanInactive);
+                }
+
+                entity.update_plan(plan.clone())?;
+
+                if old_plan_id != *plan {
+                    if let Some(ref org_id) = entity.get_props().id {
+                        self.reconcile_tenants_with_plan(org_id.clone(), &new_plan).await?;
+                    }
+                }
+                Ok(())
+            },
             OrganizationCommand::UpdateState { state } => {
                 let old_state = entity.get_props().state.clone();
                 entity.update_state(state.clone())?;
@@ -94,6 +131,69 @@ impl<'a> OrganizationOps<'a> {
         }
 
         self.repo.delete(organization_id).await
+    }
+
+    pub async fn reconcile_tenants_with_plan(&self, organization_id: OrganizationID, org_plan: &crate::core::domain::plans::plan_type::Plan) -> Result<(), OrganizationError> {
+        let tenant_repo = self.context.get_tenant_repo();
+        let tenant_ops = TenantOps::new(&tenant_repo, self.context);
+        let plan_repo = self.context.get_plan_repo();
+
+        let all_tenants = tenant_repo.fetch_all(None, Some(organization_id.clone())).await
+            .map_err(|_| OrganizationError::OrganizationNotFound)?;
+
+        let mut remaining_active_tenants: Vec<crate::core::domain::tenant::tenant_type::Tenant> = Vec::new();
+
+        for tenant in all_tenants {
+            if tenant.state == TenantState::Active {
+                let mut should_deactivate = false;
+
+                // 1. Validar features del tenant contra el nuevo plan de la organización
+                if tenant.features.validate_against_plan(&org_plan.features).is_err() {
+                    should_deactivate = true;
+                }
+
+                // 2. Si el tenant tiene un plan propio asignado, validar su estado y compatibilidad
+                if !should_deactivate {
+                    if let Some(ref t_plan_id) = tenant.plan_id {
+                        match plan_repo.fetch_by_id(t_plan_id.clone()).await {
+                            Ok(t_plan) => {
+                                if t_plan.state == crate::core::domain::plans::plan_type::PlanState::Inactive
+                                    || t_plan.features.validate_against_plan(&org_plan.features).is_err()
+                                    || tenant.features.validate_against_plan(&t_plan.features).is_err()
+                                {
+                                    should_deactivate = true;
+                                }
+                            },
+                            Err(_) => {
+                                should_deactivate = true;
+                            }
+                        }
+                    }
+                }
+
+                if should_deactivate {
+                    if let Some(ref tid) = tenant.id {
+                        let commands = vec![TenantCommand::UpdateState { state: TenantState::Inactive }];
+                        let _ = tenant_ops.dispatch_commands(tid.clone(), &commands).await;
+                    }
+                } else {
+                    remaining_active_tenants.push(tenant);
+                }
+            }
+        }
+
+        // 3. Validar límite de tenants si aplica (limit_tenant > 0)
+        if org_plan.limit_tenant > 0 && remaining_active_tenants.len() > org_plan.limit_tenant as usize {
+            let excess = remaining_active_tenants.len() - org_plan.limit_tenant as usize;
+            for tenant in remaining_active_tenants.iter().rev().take(excess) {
+                if let Some(ref tid) = tenant.id {
+                    let commands = vec![TenantCommand::UpdateState { state: TenantState::Inactive }];
+                    let _ = tenant_ops.dispatch_commands(tid.clone(), &commands).await;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     async fn cascade_state_to_tenants(&self, organization_id: OrganizationID, state: OrganizationState) -> Result<(), OrganizationError> {

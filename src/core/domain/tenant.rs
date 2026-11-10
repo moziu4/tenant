@@ -4,7 +4,7 @@ pub mod menu;
 
 use crate::data::access::tenant_repo::MongoTenantRepo;
 use crate::utils::domains_ids::{TenantID, MenuItemID, PlanID};
-use self::tenant_type::{Tenant, NewTenant, TenantState, TenantFeatures, TenantConfiguration};
+use self::tenant_type::{Tenant, NewTenant, TenantState, TenantFeatures, TenantConfiguration, RegistrationType};
 use self::menu::{Menu, MenuItem};
 use self::tenant_error::TenantError;
 
@@ -31,6 +31,7 @@ impl<'a> TenantEntity<'a> {
                 plan_id: new_tenant.plan_id,
                 configuration: new_tenant.configuration,
                 state: new_tenant.state,
+                registration_type: new_tenant.registration_type,
                 features: new_tenant.features,
                 default_language: new_tenant.default_language,
                 available_languages: new_tenant.available_languages,
@@ -68,6 +69,11 @@ impl<'a> TenantEntity<'a> {
 
     pub fn update_state(&mut self, state: TenantState) -> Result<(), TenantError> {
         self.props.state = state;
+        Ok(())
+    }
+
+    pub fn update_registration_type(&mut self, registration_type: RegistrationType) -> Result<(), TenantError> {
+        self.props.registration_type = registration_type;
         Ok(())
     }
 
