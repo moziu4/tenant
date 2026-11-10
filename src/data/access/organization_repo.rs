@@ -7,7 +7,7 @@ use mongodb::{
 
 use crate::core::domain::organization::organization_error::OrganizationError;
 use crate::core::domain::organization::organization_type::Organization;
-use crate::utils::domains_ids::OrganizationID;
+use crate::utils::domains_ids::{OrganizationID, PlanID};
 
 #[derive(Clone)]
 pub struct MongoOrganizationRepo
@@ -64,6 +64,32 @@ impl MongoOrganizationRepo
             .ok_or(OrganizationError::OrganizationNotFound)?;
 
         let organization: Organization = bson::from_document(organization_doc).map_err(|_| OrganizationError::OrganizationNotFound)?;
+        Ok(organization)
+    }
+
+    pub async fn fetch_by_host(&self, host: &str) -> Result<Organization, OrganizationError>
+    {
+        let filter = doc! { "host": host };
+        let organization_doc = self.collection.find_one(filter)
+            .await
+            .map_err(|_| OrganizationError::OrganizationNotFound)?
+            .ok_or(OrganizationError::OrganizationNotFound)?;
+
+        let organization: Organization = bson::from_document(organization_doc)
+            .map_err(|_| OrganizationError::OrganizationNotFound)?;
+        Ok(organization)
+    }
+
+    pub async fn fetch_by_plan_id(&self, plan_id: PlanID) -> Result<Organization, OrganizationError>
+    {
+        let filter = doc! { "plan": ObjectId::from(plan_id) };
+        let organization_doc = self.collection.find_one(filter)
+            .await
+            .map_err(|_| OrganizationError::OrganizationNotFound)?
+            .ok_or(OrganizationError::OrganizationNotFound)?;
+
+        let organization: Organization = bson::from_document(organization_doc)
+            .map_err(|_| OrganizationError::OrganizationNotFound)?;
         Ok(organization)
     }
 

@@ -133,12 +133,20 @@ impl<'a> OrganizationOps<'a> {
         self.repo.delete(organization_id).await
     }
 
+    pub async fn get_organization_by_host(&self, host: &str) -> Result<Organization, OrganizationError> {
+        self.repo.fetch_by_host(host).await
+    }
+
+    pub async fn get_organization_by_plan_id(&self, plan_id: crate::utils::domains_ids::PlanID) -> Result<Organization, OrganizationError> {
+        self.repo.fetch_by_plan_id(plan_id).await
+    }
+
     pub async fn reconcile_tenants_with_plan(&self, organization_id: OrganizationID, org_plan: &crate::core::domain::plans::plan_type::Plan) -> Result<(), OrganizationError> {
         let tenant_repo = self.context.get_tenant_repo();
         let tenant_ops = TenantOps::new(&tenant_repo, self.context);
         let plan_repo = self.context.get_plan_repo();
 
-        let all_tenants = tenant_repo.fetch_all(None, Some(organization_id.clone())).await
+        let all_tenants = tenant_repo.fetch_all(Some(organization_id.clone())).await
             .map_err(|_| OrganizationError::OrganizationNotFound)?;
 
         let mut remaining_active_tenants: Vec<crate::core::domain::tenant::tenant_type::Tenant> = Vec::new();
@@ -147,19 +155,13 @@ impl<'a> OrganizationOps<'a> {
             if tenant.state == TenantState::Active {
                 let mut should_deactivate = false;
 
-                // 1. Validar features del tenant contra el nuevo plan de la organización
-                if tenant.features.validate_against_plan(&org_plan.features).is_err() {
-                    should_deactivate = true;
-                }
-
-                // 2. Si el tenant tiene un plan propio asignado, validar su estado y compatibilidad
+                // Validar el estado y compatibilidad del plan propio del tenant.
                 if !should_deactivate {
                     if let Some(ref t_plan_id) = tenant.plan_id {
                         match plan_repo.fetch_by_id(t_plan_id.clone()).await {
                             Ok(t_plan) => {
                                 if t_plan.state == crate::core::domain::plans::plan_type::PlanState::Inactive
                                     || t_plan.features.validate_against_plan(&org_plan.features).is_err()
-                                    || tenant.features.validate_against_plan(&t_plan.features).is_err()
                                 {
                                     should_deactivate = true;
                                 }

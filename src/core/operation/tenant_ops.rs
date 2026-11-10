@@ -49,11 +49,9 @@ impl<'a> TenantOps<'a> {
             return Err(TenantError::PlanNotFound);
         }
 
-        new_tenant.features.validate_against_plan(&org_plan.features)?;
-
         // 3. Validar límite de tenants si aplica (limit_tenant > 0)
         if org_plan.limit_tenant > 0 && new_tenant.state == TenantState::Active {
-            let existing_tenants = self.repo.fetch_all(None, Some(new_tenant.organization_id.clone())).await?;
+            let existing_tenants = self.repo.fetch_all(Some(new_tenant.organization_id.clone())).await?;
             let active_count = existing_tenants.iter().filter(|t| t.state == TenantState::Active).count();
             if (active_count as i32) >= org_plan.limit_tenant {
                 return Err(TenantError::TenantLimitReached);
@@ -81,12 +79,6 @@ impl<'a> TenantOps<'a> {
             }
 
             // Validar que las features del plan de tenant están permitidas por el plan de la organización
-            tenant_plan.features.validate_against_plan(&org_plan.features)
-                .map_err(TenantError::FeatureNotAllowedByPlan)?;
-
-            // Validar que las features del tenant están permitidas por el plan de tenant
-            new_tenant.features.validate_against_plan(&tenant_plan.features)
-                .map_err(|_| TenantError::FeatureNotAllowedByTenantPlan("Feature not allowed by tenant plan".to_string()))?;
         }
 
         let entity = TenantEntity::new(new_tenant, self.repo);
@@ -97,9 +89,9 @@ impl<'a> TenantOps<'a> {
             let event = TenantCreatedEvent {
                 organization_id: tenant.organization_id.to_string(),
                 tenant_id: id.to_string(),
-                name: tenant.name.clone(),
+                name: org.name.clone(),
                 available_languages: tenant.available_languages.clone(),
-                features: tenant.features.clone(),
+                features: org.features.clone(),
                 plan_id: tenant.plan_id.as_ref().map(|p| p.to_string()),
             };
             println!("Event: {:?}", event);
@@ -110,18 +102,16 @@ impl<'a> TenantOps<'a> {
         Ok(tenant)
     }
 
-    pub async fn load_all_tenants(&self, host: Option<String>, organization_id: Option<OrganizationID>) -> Result<Vec<Tenant>, TenantError> {
-        let cache_key = match (&host, &organization_id) {
-            (Some(h), Some(oid)) => format!("all_tenants_{}_{}", h, oid),
-            (Some(h), None) => format!("all_tenants_{}", h),
-            (None, Some(oid)) => format!("all_tenants_{}", oid),
-            (None, None) => "all_tenants".to_string(),
+    pub async fn load_all_tenants(&self, organization_id: Option<OrganizationID>) -> Result<Vec<Tenant>, TenantError> {
+        let cache_key = match &organization_id {
+            Some(oid) => format!("all_tenants_{}", oid),
+            None => "all_tenants".to_string(),
         };
         if let Some(tenants) = self.get_tenant_cache(&cache_key).await {
             return tenants;
         }
 
-        let tenants = self.repo.fetch_all(host, organization_id).await?;
+        let tenants = self.repo.fetch_all(organization_id).await?;
         self.set_tenant_cache(cache_key, &tenants).await?;
         Ok(tenants)
     }
@@ -130,8 +120,15 @@ impl<'a> TenantOps<'a> {
         self.repo.fetch_by_id(id).await
     }
 
-    pub async fn load_tenant_by_host(&self, host: String) -> Result<Tenant, TenantError> {
-        self.repo.fetch_by_host(host).await
+    pub async fn get_tenants_by_organization_id(&self, organization_id: OrganizationID) -> Result<Vec<Tenant>, TenantError> {
+        self.repo.fetch_by_organization_id(organization_id).await
+    }
+
+    pub async fn load_tenant_by_host(&self, _host: String) -> Result<Tenant, TenantError> {
+        self.repo.fetch_all(None).await?
+            .into_iter()
+            .next()
+            .ok_or(TenantError::TenantNotFound)
     }
 
     pub async fn dispatch_commands(&self, tenant_id: TenantID, commands: &[TenantCommand]) -> Result<Tenant, TenantError> {
@@ -148,7 +145,6 @@ impl<'a> TenantOps<'a> {
 
     async fn dispatch_command(&self, entity: &mut TenantEntity<'a>, command: &TenantCommand) -> Result<(), TenantError> {
         match command {
-            TenantCommand::UpdateName { name } => entity.update_name(name.clone()),
             TenantCommand::UpdateState { state } => {
                 let old_state = entity.get_props().state.clone();
                 if *state == TenantState::Active && old_state != TenantState::Active {
@@ -172,11 +168,9 @@ impl<'a> TenantOps<'a> {
                         return Err(TenantError::PlanNotFound);
                     }
 
-                    entity.get_props().features.validate_against_plan(&org_plan.features)?;
-
                     // Validar límite de tenants si aplica (limit_tenant > 0)
                     if org_plan.limit_tenant > 0 {
-                        let existing_tenants = self.repo.fetch_all(None, Some(entity.get_props().organization_id.clone())).await?;
+                        let existing_tenants = self.repo.fetch_all(Some(entity.get_props().organization_id.clone())).await?;
                         let current_id = entity.get_props().id.as_ref();
                         let active_count = existing_tenants.iter().filter(|t| t.state == TenantState::Active && t.id.as_ref() != current_id).count();
                         if (active_count as i32) >= org_plan.limit_tenant {
@@ -207,8 +201,6 @@ impl<'a> TenantOps<'a> {
                         tenant_plan.features.validate_against_plan(&org_plan.features)
                             .map_err(TenantError::FeatureNotAllowedByPlan)?;
 
-                        entity.get_props().features.validate_against_plan(&tenant_plan.features)
-                            .map_err(|_| TenantError::FeatureNotAllowedByTenantPlan("Feature not allowed by tenant plan".to_string()))?;
                     }
                 }
 
@@ -225,33 +217,6 @@ impl<'a> TenantOps<'a> {
                 Ok(())
             },
             TenantCommand::UpdateRegistrationType { registration_type } => entity.update_registration_type(registration_type.clone()),
-            TenantCommand::UpdateConfiguration { configuration } => entity.update_configuration(configuration.clone()),
-            TenantCommand::UpdateFeatures { features } => {
-                // Validar que las features están permitidas por el plan de la organización
-                let organization_repo = self.context.get_organization_repo();
-                let org = organization_repo.fetch_by_id(entity.get_props().organization_id.clone())
-                    .await
-                    .map_err(|_| TenantError::OrganizationNotFound)?;
-
-                let plan_repo = self.context.get_plan_repo();
-                let org_plan = plan_repo.fetch_by_id(org.plan.clone())
-                    .await
-                    .map_err(|_| TenantError::PlanNotFound)?;
-
-                features.validate_against_plan(&org_plan.features)?;
-
-                // Si el tenant tiene un plan propio asignado, validar también contra él
-                if let Some(ref tenant_plan_id) = entity.get_props().plan_id {
-                    let tenant_plan = plan_repo.fetch_by_id(tenant_plan_id.clone())
-                        .await
-                        .map_err(|_| TenantError::TenantPlanNotFound)?;
-
-                    features.validate_against_plan(&tenant_plan.features)
-                        .map_err(|_| TenantError::FeatureNotAllowedByTenantPlan("Feature not allowed by tenant plan".to_string()))?;
-                }
-
-                entity.update_features(features.clone())
-            },
             TenantCommand::UpdatePlan { plan_id } => {
                 if let Some(ref pid) = plan_id {
                     let plan_repo = self.context.get_plan_repo();
@@ -282,12 +247,6 @@ impl<'a> TenantOps<'a> {
                         .await
                         .map_err(|_| TenantError::PlanNotFound)?;
 
-                    tenant_plan.features.validate_against_plan(&org_plan.features)
-                        .map_err(TenantError::FeatureNotAllowedByPlan)?;
-
-                    // Validar que las features actuales del tenant son compatibles con el nuevo plan
-                    entity.get_props().features.validate_against_plan(&tenant_plan.features)
-                        .map_err(|_| TenantError::FeatureNotAllowedByTenantPlan("Current tenant features exceed the new tenant plan".to_string()))?;
                 }
 
                 entity.update_plan_id(plan_id.clone())

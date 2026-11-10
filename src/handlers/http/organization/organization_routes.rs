@@ -13,7 +13,7 @@ use crate::core::domain::perms_cat::*;
 use crate::core::domain::organization::organization_type::NewOrganization;
 use crate::core::operation::organization_ops::OrganizationOps;
 use crate::core::commands::organization_command::OrganizationCommand;
-use crate::utils::domains_ids::OrganizationID;
+use crate::utils::domains_ids::{OrganizationID, PlanID};
 use crate::context::Context;
 
 #[rustfmt::skip]
@@ -23,6 +23,8 @@ pub fn config(cfg: &mut web::ServiceConfig)
         web::scope("/api/organization")
             .route("",              web::post().to(create_organization))
             .route("/all",          web::get().to(load_all_organizations))
+            .route("/host/{host}",  web::get().to(get_organization_by_host))
+            .route("/plan/{plan_id}", web::get().to(get_organization_by_plan_id))
             .route("/{id}",         web::get().to(get_organization_by_id))
             .route("/{id}",         web::patch().to(dispatch_commands))
             .route("/{id}",         web::delete().to(delete_organization_by_id)),
@@ -91,6 +93,44 @@ async fn get_organization_by_id(req: HttpRequest,
     {
         Ok(organization) => HttpResponse::Ok().json(organization),
         Err(err) => HttpResponse::InternalServerError().json(err.to_string()),
+    }
+}
+
+async fn get_organization_by_host(path: Path<String>,
+                                  context: web::Data<Arc<Context>>) -> impl Responder
+{
+    let organization_repo = context.get_ref().get_organization_repo();
+    let organization_ops = OrganizationOps::new(&organization_repo, &context);
+
+    match organization_ops.get_organization_by_host(&path.into_inner()).await
+    {
+        Ok(organization) => HttpResponse::Ok().json(organization),
+        Err(_) => HttpResponse::NotFound().finish(),
+    }
+}
+
+async fn get_organization_by_plan_id(req: HttpRequest,
+                                     _hub_ctx: HubContext,
+                                     path: Path<String>,
+                                     context: web::Data<Arc<Context>>) -> impl Responder
+{
+    let secret = env::var("SECRET_KEY").expect("SECRET_KEY not found");
+    if !has_permission(secret, req, ORGANIZATION_READ_GLOBAL).await
+    {
+        return HttpResponse::Forbidden().body("No permission");
+    }
+
+    let plan_id = match PlanID::parse_str(&path.into_inner()) {
+        Ok(id) => id,
+        Err(_) => return HttpResponse::BadRequest().body("Invalid ID format"),
+    };
+
+    let organization_repo = context.get_ref().get_organization_repo();
+    let organization_ops = OrganizationOps::new(&organization_repo, &context);
+    match organization_ops.get_organization_by_plan_id(plan_id).await
+    {
+        Ok(organization) => HttpResponse::Ok().json(organization),
+        Err(_) => HttpResponse::NotFound().finish(),
     }
 }
 

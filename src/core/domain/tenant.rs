@@ -2,15 +2,15 @@ pub mod tenant_type;
 pub mod tenant_error;
 pub mod menu;
 
-use crate::data::access::tenant_repo::MongoTenantRepo;
-use crate::utils::domains_ids::{TenantID, MenuItemID, PlanID};
-use self::tenant_type::{Tenant, NewTenant, TenantState, TenantFeatures, TenantConfiguration, RegistrationType};
 use self::menu::{Menu, MenuItem};
 use self::tenant_error::TenantError;
+use self::tenant_type::{NewTenant, RegistrationType, Tenant, TenantState};
+use crate::data::access::tenant_repo::MongoTenantRepo;
+use crate::utils::domains_ids::{MenuItemID, PlanID, TenantID};
 
 pub struct TenantEntity<'a> {
     props: Tenant,
-    repo:  &'a MongoTenantRepo,
+    repo: &'a MongoTenantRepo,
 }
 
 impl<'a> TenantEntity<'a> {
@@ -25,14 +25,10 @@ impl<'a> TenantEntity<'a> {
             repo,
             props: Tenant {
                 id: None,
-                host: new_tenant.host,
-                name: new_tenant.name,
                 organization_id: new_tenant.organization_id,
                 plan_id: new_tenant.plan_id,
-                configuration: new_tenant.configuration,
                 state: new_tenant.state,
                 registration_type: new_tenant.registration_type,
-                features: new_tenant.features,
                 default_language: new_tenant.default_language,
                 available_languages: new_tenant.available_languages,
                 menus,
@@ -54,14 +50,6 @@ impl<'a> TenantEntity<'a> {
         Ok(Self { props: tenant, repo })
     }
 
-    pub fn update_name(&mut self, name: String) -> Result<(), TenantError> {
-        if name.is_empty() {
-            return Err(TenantError::EmptyName);
-        }
-        self.props.name = name;
-        Ok(())
-    }
-
     pub fn update_plan_id(&mut self, plan_id: Option<PlanID>) -> Result<(), TenantError> {
         self.props.plan_id = plan_id;
         Ok(())
@@ -74,16 +62,6 @@ impl<'a> TenantEntity<'a> {
 
     pub fn update_registration_type(&mut self, registration_type: RegistrationType) -> Result<(), TenantError> {
         self.props.registration_type = registration_type;
-        Ok(())
-    }
-
-    pub fn update_configuration(&mut self, configuration: TenantConfiguration) -> Result<(), TenantError> {
-        self.props.configuration = configuration;
-        Ok(())
-    }
-
-    pub fn update_features(&mut self, features: TenantFeatures) -> Result<(), TenantError> {
-        self.props.features = features;
         Ok(())
     }
 
@@ -127,15 +105,6 @@ impl<'a> TenantEntity<'a> {
                 continue;
             }
 
-            // Validar feature
-            if let self::menu::MenuItemType::Feature { feature, .. } = &item.item_type {
-                let has_feature = match feature {
-                    self::menu::FeatureType::Migration => self.props.features.migration,
-                };
-                if !has_feature {
-                    continue;
-                }
-            }
 
             // Recursividad para hijos
             let mut item_clone = item.clone();

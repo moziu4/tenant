@@ -35,12 +35,9 @@ impl MongoTenantRepo
         Ok(new_tenant)
     }
 
-    pub async fn fetch_all(&self, host: Option<String>, organization_id: Option<OrganizationID>) -> Result<Vec<Tenant>, TenantError>
+    pub async fn fetch_all(&self, organization_id: Option<OrganizationID>) -> Result<Vec<Tenant>, TenantError>
     {
         let mut filter = doc! {};
-        if let Some(h) = host {
-            filter.insert("host", h.trim());
-        }
         if let Some(oid) = organization_id {
             filter.insert("organization_id", ObjectId::from(oid));
         }
@@ -93,6 +90,11 @@ impl MongoTenantRepo
             TenantError::TenantNotFound
         })?;
         Ok(tenant)
+    }
+
+    pub async fn fetch_by_organization_id(&self, organization_id: OrganizationID) -> Result<Vec<Tenant>, TenantError>
+    {
+        self.fetch_all(Some(organization_id)).await
     }
 
     pub async fn save(&self, tenant: Tenant) -> Result<Tenant, TenantError>
@@ -151,24 +153,4 @@ impl MongoTenantRepo
         }
     }
 
-    pub async fn fetch_by_host(&self, host: String) -> Result<Tenant, TenantError>
-    {
-        let filter = doc! { "host": host.trim() };
-        let tenant_doc = self.collection.find_one(filter)
-            .await
-            .map_err(|e| {
-                eprintln!("Error fetching by host: {:?}", e);
-                TenantError::TenantNotFound
-            })?
-            .ok_or_else(|| {
-                eprintln!("Tenant not found for host: {}", host);
-                TenantError::TenantNotFound
-            })?;
-
-        let tenant: Tenant = bson::from_document(tenant_doc).map_err(|e| {
-            eprintln!("Error deserializing tenant: {:?}", e);
-            TenantError::TenantNotFound
-        })?;
-        Ok(tenant)
-    }
 }

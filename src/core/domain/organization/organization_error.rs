@@ -12,6 +12,7 @@ pub enum OrganizationError {
     PlanNotFound,
     PlanInactive,
     InvalidPlan(String),
+    FeatureNotAllowedByPlan(String),
 }
 
 impl std::fmt::Display for OrganizationError {
@@ -27,6 +28,7 @@ impl std::fmt::Display for OrganizationError {
             OrganizationError::PlanNotFound => write!(f, "Organization plan not found"),
             OrganizationError::PlanInactive => write!(f, "Organization plan is inactive"),
             OrganizationError::InvalidPlan(msg) => write!(f, "Invalid organization plan: {}", msg),
+            OrganizationError::FeatureNotAllowedByPlan(feature) => write!(f, "Feature not allowed by plan: {}", feature),
         }
     }
 }

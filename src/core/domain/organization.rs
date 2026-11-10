@@ -1,15 +1,15 @@
 pub mod organization_type;
 pub mod organization_error;
 
+use self::organization_error::OrganizationError;
+use self::organization_type::{NewOrganization, Organization, OrganizationConfiguration, OrganizationFeatures};
+use crate::core::commands::organization_command::OrganizationState;
 use crate::data::access::organization_repo::MongoOrganizationRepo;
 use crate::utils::domains_ids::{OrganizationID, PlanID};
-use self::organization_type::{Organization, NewOrganization};
-use self::organization_error::OrganizationError;
-use crate::core::commands::organization_command::OrganizationState;
 
 pub struct OrganizationEntity<'a> {
     props: Organization,
-    repo:  &'a MongoOrganizationRepo,
+    repo: &'a MongoOrganizationRepo,
 }
 
 impl<'a> OrganizationEntity<'a> {
@@ -18,10 +18,13 @@ impl<'a> OrganizationEntity<'a> {
             repo,
             props: Organization {
                 id: None,
+                host: new_organization.host,
                 name: new_organization.name,
                 plan: new_organization.plan,
                 state: new_organization.state,
-                limits: new_organization.limits
+                limits: new_organization.limits,
+                configuration: new_organization.configuration,
+                features: new_organization.features,
             },
         }
     }
@@ -52,7 +55,17 @@ impl<'a> OrganizationEntity<'a> {
         self.props.plan = plan;
         Ok(())
     }
-    
+
+    pub fn update_configuration(&mut self, configuration: OrganizationConfiguration) -> Result<(), OrganizationError> {
+        self.props.configuration = configuration;
+        Ok(())
+    }
+
+    pub fn update_features(&mut self, features: OrganizationFeatures) -> Result<(), OrganizationError> {
+        self.props.features = features;
+        Ok(())
+    }
+
 
     pub fn get_props(&self) -> &Organization {
         &self.props

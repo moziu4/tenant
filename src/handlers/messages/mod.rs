@@ -2,7 +2,8 @@ pub mod nats_handler;
 pub mod nats_subscriber;
 
 use serde::{Serialize, Deserialize, Deserializer};
-use crate::core::domain::tenant::tenant_type::{TenantFeatures, TenantState};
+use crate::core::domain::organization::organization_type::OrganizationFeatures;
+use crate::core::domain::tenant::tenant_type::TenantState;
 
 // Deserializador personalizado para manejar tanto String plano como {"$oid": "..."}
 fn deserialize_mongo_id<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -42,7 +43,7 @@ pub struct TenantCreatedEvent {
     pub tenant_id: String,
     pub name: String,
     pub available_languages: Vec<String>,
-    pub features: TenantFeatures,
+    pub features: OrganizationFeatures,
     pub organization_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plan_id: Option<String>,
